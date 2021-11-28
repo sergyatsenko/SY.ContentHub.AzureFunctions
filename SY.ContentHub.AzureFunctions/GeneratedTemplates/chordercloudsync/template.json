@@ -1,0 +1,171 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_chordercloudsync_name": {
+            "defaultValue": "chordercloudsync",
+            "type": "String"
+        },
+        "sites_contenthubfunctions_externalid": {
+            "defaultValue": "/subscriptions/9253b674-4dbe-45f2-b34b-f333fc9082f4/resourceGroups/Xcentium/providers/Microsoft.Web/sites/contenthubfunctions",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_chordercloudsync_name')]",
+            "location": "westus",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "properties": {
+                                        "EventType": {
+                                            "type": "string"
+                                        },
+                                        "IsNew": {
+                                            "type": "boolean"
+                                        },
+                                        "TargetDefinition": {
+                                            "type": "string"
+                                        },
+                                        "TargetId": {
+                                            "type": "integer"
+                                        },
+                                        "TimeStamp": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Create_product_in_OrderCloud": {
+                            "runAfter": {
+                                "Parse_JSON": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "body": "@body('RenderTemplate')",
+                                "headers": {
+                                    "Authorization": "Bearer @{body('Parse_JSON')?['access_token']}",
+                                    "Content-Type": "application/json"
+                                },
+                                "method": "POST",
+                                "uri": "https://sandboxapi.ordercloud.io/v1/products"
+                            }
+                        },
+                        "GetEntityData": {
+                            "runAfter": {},
+                            "type": "Function",
+                            "inputs": {
+                                "body": "@triggerBody()",
+                                "function": {
+                                    "id": "[concat(parameters('sites_contenthubfunctions_externalid'), '/functions/GetEntityData')]"
+                                },
+                                "headers": {
+                                    "ClientId": "DevIntegration",
+                                    "ClientSecret": "DevIntegration",
+                                    "ContentHubUrl": "https://xc403.stylelabsdemo.com/",
+                                    "EntityRelations": "PCMProductFamilyToProduct",
+                                    "Password": "Integration1",
+                                    "TargetEntityIdJsonPath": "$.TargetId",
+                                    "UserName": "Integration"
+                                }
+                            }
+                        },
+                        "Get_OrderCloud_Auth_token": {
+                            "runAfter": {
+                                "RenderTemplate": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "body": "client_id=CF17C417-7E57-40CF-A13C-82A17204EAD9&grant_type=password&username=admin01&password=Welcome2020",
+                                "headers": {
+                                    "Content-Type": "application/x-www-form-urlencoded"
+                                },
+                                "method": "POST",
+                                "uri": "https://sandboxapi.ordercloud.io/oauth/token"
+                            }
+                        },
+                        "Parse_JSON": {
+                            "runAfter": {
+                                "Get_OrderCloud_Auth_token": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ParseJson",
+                            "inputs": {
+                                "content": "@body('Get_OrderCloud_Auth_token')",
+                                "schema": {
+                                    "properties": {
+                                        "access_token": {
+                                            "type": "string"
+                                        },
+                                        "expires_in": {
+                                            "type": "integer"
+                                        },
+                                        "refresh_token": {},
+                                        "token_type": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "RenderTemplate": {
+                            "runAfter": {
+                                "GetEntityData": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Function",
+                            "inputs": {
+                                "body": "@body('GetEntityData')",
+                                "function": {
+                                    "id": "[concat(parameters('sites_contenthubfunctions_externalid'), '/functions/RenderTemplate')]"
+                                },
+                                "headers": {
+                                    "Template": "{ \"DefaultPriceScheduleID\": \"\", \"ID\": \"{{$.Properties.Id}}\", \"Name\": \"{{$.Properties.ProductName}}\", \"Description\": \"{{$.Properties.ProductShortDescription}}\", \"QuantityMultiplier\": 1, \"ShipWeight\": 0, \"ShipHeight\": 0, \"ShipWidth\": 0, \"ShipLength\": 0, \"Active\": true, \"xp\": {}, \"ShipFromAddressID\": \"\", \"Inventory\": {   \"Enabled\": false,   \"NotificationPoint\": 0,   \"VariantLevelTracking\": false,   \"OrderCanExceed\": false,   \"QuantityAvailable\": 0 }, \"DefaultSupplierID\": \"\" }"
+                                }
+                            }
+                        },
+                        "Response": {
+                            "runAfter": {
+                                "Create_product_in_OrderCloud": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Response",
+                            "kind": "Http",
+                            "inputs": {
+                                "body": "@body('Create_product_in_OrderCloud')",
+                                "statusCode": 200
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        }
+    ]
+}

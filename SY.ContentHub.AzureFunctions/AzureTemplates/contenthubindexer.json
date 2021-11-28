@@ -1,0 +1,108 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "actions": {
+      "GetEntityData": {
+        "inputs": {
+          "body": "@triggerBody()",
+          "function": {
+            "id": "/subscriptions/9253b674-4dbe-45f2-b34b-f333fc9082f4/resourceGroups/Xcentium/providers/Microsoft.Web/sites/contenthubfunctions/functions/GetEntityData"
+          },
+          "headers": {
+            "ClientId": "DevIntegration",
+            "ClientSecret": "DevIntegration",
+            "ContentHubUrl": "https://xc403.stylelabsdemo.com/",
+            "EntityRelations": "PCMProductFamilyToProduct",
+            "Password": "Integration1",
+            "TargetEntityIdJsonPath": "$.TargetId",
+            "UserName": "Integration"
+          }
+        },
+        "runAfter": {},
+        "type": "Function"
+      },
+      "RenderTemplate": {
+        "inputs": {
+          "body": "@body('GetEntityData')",
+          "function": {
+            "id": "/subscriptions/9253b674-4dbe-45f2-b34b-f333fc9082f4/resourceGroups/Xcentium/providers/Microsoft.Web/sites/contenthubfunctions/functions/RenderTemplate"
+          },
+          "headers": {
+            "Template": "[ { \"_datasource\":\"[[datasource]]\",     \"_uniqueid\":\"{{$.Properties.Identifier}}\", \"entityId_tl\":\"{{$.Properties.Id}}\",      \"contentHubId_tl\":{{$.Properties.Id}},     \"productName_s\":\"{{$.Properties.ProductName}}\" } ]"
+          }
+        },
+        "runAfter": {
+          "GetEntityData": [
+            "Succeeded"
+          ]
+        },
+        "type": "Function"
+      },
+      "Response": {
+        "inputs": {
+          "body": "@body('Update_Solr_Master_index')",
+          "statusCode": 200
+        },
+        "kind": "Http",
+        "runAfter": {
+          "Update_Solr_Master_index": [
+            "Succeeded"
+          ]
+        },
+        "type": "Response"
+      },
+      "Update_Solr_Master_index": {
+        "inputs": {
+          "body": "@body('RenderTemplate')",
+          "headers": {
+            "": "application/json",
+            "Authorization": "Basic c2M6VkxwTWdYYU44Ylk"
+          },
+          "method": "POST",
+          "queries": {
+            "Content-Type": ""
+          },
+          "uri": "https://ss615579-5yy9t6op-eastus-azure.searchstax.com/solr/sitecore_master_index/update?commitWithin=1000"
+        },
+        "runAfter": {
+          "RenderTemplate": [
+            "Succeeded"
+          ]
+        },
+        "type": "Http"
+      }
+    },
+    "contentVersion": "1.0.0.0",
+    "outputs": {},
+    "parameters": {},
+    "triggers": {
+      "manual": {
+        "inputs": {
+          "schema": {
+            "properties": {
+              "EventType": {
+                "type": "string"
+              },
+              "IsNew": {
+                "type": "boolean"
+              },
+              "TargetDefinition": {
+                "type": "string"
+              },
+              "TargetId": {
+                "type": "integer"
+              },
+              "TimeStamp": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "kind": "Http",
+        "type": "Request"
+      }
+    }
+  },
+  "parameters": {}
+}

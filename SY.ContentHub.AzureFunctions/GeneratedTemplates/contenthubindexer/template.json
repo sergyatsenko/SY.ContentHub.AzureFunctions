@@ -1,0 +1,132 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_contenthubindexer_name": {
+            "defaultValue": "contenthubindexer",
+            "type": "String"
+        },
+        "sites_contenthubfunctions_externalid": {
+            "defaultValue": "/subscriptions/9253b674-4dbe-45f2-b34b-f333fc9082f4/resourceGroups/Xcentium/providers/Microsoft.Web/sites/contenthubfunctions",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_contenthubindexer_name')]",
+            "location": "westus",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "properties": {
+                                        "EventType": {
+                                            "type": "string"
+                                        },
+                                        "IsNew": {
+                                            "type": "boolean"
+                                        },
+                                        "TargetDefinition": {
+                                            "type": "string"
+                                        },
+                                        "TargetId": {
+                                            "type": "integer"
+                                        },
+                                        "TimeStamp": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "GetEntityData": {
+                            "runAfter": {},
+                            "type": "Function",
+                            "inputs": {
+                                "body": "@triggerBody()",
+                                "function": {
+                                    "id": "[concat(parameters('sites_contenthubfunctions_externalid'), '/functions/GetEntityData')]"
+                                },
+                                "headers": {
+                                    "ClientId": "DevIntegration",
+                                    "ClientSecret": "DevIntegration",
+                                    "ContentHubUrl": "https://xc403.stylelabsdemo.com/",
+                                    "EntityRelations": "PCMProductFamilyToProduct",
+                                    "Password": "Integration1",
+                                    "TargetEntityIdJsonPath": "$.TargetId",
+                                    "UserName": "Integration"
+                                }
+                            }
+                        },
+                        "RenderTemplate": {
+                            "runAfter": {
+                                "GetEntityData": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Function",
+                            "inputs": {
+                                "body": "@body('GetEntityData')",
+                                "function": {
+                                    "id": "[concat(parameters('sites_contenthubfunctions_externalid'), '/functions/RenderTemplate')]"
+                                },
+                                "headers": {
+                                    "Template": "[[ { \"_datasource\":\"[[datasource]]\",     \"_uniqueid\":\"{{$.Properties.Identifier}}\", \"entityId_tl\":\"{{$.Properties.Id}}\",      \"contentHubId_tl\":{{$.Properties.Id}},     \"productName_s\":\"{{$.Properties.ProductName}}\" } ]"
+                                }
+                            }
+                        },
+                        "Response": {
+                            "runAfter": {
+                                "Update_Solr_Master_index": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Response",
+                            "kind": "Http",
+                            "inputs": {
+                                "body": "@body('Update_Solr_Master_index')",
+                                "statusCode": 200
+                            }
+                        },
+                        "Update_Solr_Master_index": {
+                            "runAfter": {
+                                "RenderTemplate": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "body": "@body('RenderTemplate')",
+                                "headers": {
+                                    "": "application/json",
+                                    "Authorization": "Basic c2M6VkxwTWdYYU44Ylk"
+                                },
+                                "method": "POST",
+                                "queries": {
+                                    "Content-Type": ""
+                                },
+                                "uri": "https://ss615579-5yy9t6op-eastus-azure.searchstax.com/solr/sitecore_master_index/update?commitWithin=1000"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            }
+        }
+    ]
+}

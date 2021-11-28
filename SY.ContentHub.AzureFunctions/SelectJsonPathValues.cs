@@ -4,16 +4,11 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
-using Stylelabs.M.Framework.Essentials.LoadConfigurations;
-using Stylelabs.M.Sdk.Contracts.Base;
-using Stylelabs.M.Sdk.WebClient;
-using Stylelabs.M.Sdk.WebClient.Authentication;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -31,24 +26,28 @@ namespace SY.ContentHub.AzureFunctions
             string requestBody = content.ReadAsStringAsync().Result;
             dynamic data = JsonConvert.DeserializeObject(requestBody);
 
-            Dictionary<string, string> output = new Dictionary<string, string>();
+            var output = new Dictionary<string, object>();
             foreach (var header in req.Headers)
             {
                 string key = header.Key;
+                if (string.IsNullOrEmpty(key)) continue;
 
-                if (!key.StartsWith("_")) continue;
                 string value = string.Join(",", header.Value.ToArray());
-                if (key.Equals("_datasource", StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrEmpty(value) || value.Length < 5) continue;
+
+                var valueStripped = value.Substring(2, value.Length - 4);
+
+                if (value.StartsWith("[[") && value.EndsWith("]]"))
                 {
-                    output.Add("_datasource", value);
-                    continue;
+                    output.Add(key, valueStripped);
                 }
-                log.Info(key);
-                if (string.IsNullOrEmpty(key) || string.IsNullOrEmpty(value)) continue;
-                string token = data.SelectToken(value);
-                if (!string.IsNullOrEmpty(token))
+                else if (value.StartsWith("{{") && value.EndsWith("}}"))
                 {
-                    output.Add(key.Substring(1, key.Length - 1), token);
+                    string token = data.SelectToken(valueStripped);
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        output.Add(key, token);
+                    }
                 }
             }
 
