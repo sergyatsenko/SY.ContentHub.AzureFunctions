@@ -75,7 +75,7 @@ namespace SY.ContentHub.AzureFunctions
 		[FunctionName("UpsertRelation")]
 		public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage req, TraceWriter log)
 		{
-			log.Info("CreateOrUpdateRelationWithSearch invoked.");
+			log.Info("UpsertRelation invoked.");
 			var content = req.Content;
 			string requestBody = content.ReadAsStringAsync().Result;
 			log.Info($"Request body: {requestBody}");
@@ -85,14 +85,16 @@ namespace SY.ContentHub.AzureFunctions
 			{
 				requestObject.Validate();
 
-				if (requestObject.continueOnEmptySearchFields 
+				if (requestObject.continueOnEmptySearchFields
 					&& (
 					string.IsNullOrEmpty(requestObject.entitySearch.parentEntitySearchField.fieldValue)
 					|| string.IsNullOrEmpty(requestObject.entitySearch.childEntitySearchField.fieldValue)))
 				{
+					var message = $"Skipping relation creation as continueOnEmptySearchFields is set to true.  Parent entity search value: {requestObject.entitySearch.parentEntitySearchField.fieldValue}, Child entity search value: {requestObject.entitySearch.childEntitySearchField.fieldValue}";
+					log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
 					return new HttpResponseMessage(HttpStatusCode.OK)
 					{
-						Content = new StringContent($"Skipping relation creation as continueOnEmptySearchFields is set to true.  Parent entity search value: {requestObject.entitySearch.parentEntitySearchField.fieldValue}, Child entity search value: {requestObject.entitySearch.childEntitySearchField.fieldValue}")
+						Content = new StringContent(message)
 					};
 				}
 
@@ -110,7 +112,7 @@ namespace SY.ContentHub.AzureFunctions
 				IEntity parentEntity = await Utils.SearchSingleEntity(client,
 					requestObject.entitySearch.parentEntitySearchField.fieldName,
 					requestObject.entitySearch.parentEntitySearchField.fieldValue,
-					requestObject.entitySearch.parentEntitySearchField.definitionName, 
+					requestObject.entitySearch.parentEntitySearchField.definitionName,
 					EntityLoadConfiguration.Full, log);
 
 				IEntity childEntity = await Utils.SearchSingleEntity(client,
@@ -141,7 +143,7 @@ namespace SY.ContentHub.AzureFunctions
 								long addedResult = await client.Entities.SaveAsync(parentEntity);
 								message = $"Successfully added relation. Relation Name: {requestObject.entityData.relationFieldName},Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
 							}
-							
+
 						}
 						else
 						{
@@ -155,7 +157,7 @@ namespace SY.ContentHub.AzureFunctions
 							else
 							{
 								message = $"Relation already exists - skipping. Relation Name: {requestObject.entityData.relationFieldName}, Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
-							}	
+							}
 						}
 
 						log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
@@ -193,7 +195,7 @@ namespace SY.ContentHub.AzureFunctions
 						log?.Error(message, null, MethodBase.GetCurrentMethod().DeclaringType.Name);
 						return new HttpResponseMessage(HttpStatusCode.NotFound)
 						{
-							Content = new StringContent(message) 
+							Content = new StringContent(message)
 						};
 					}
 				}
