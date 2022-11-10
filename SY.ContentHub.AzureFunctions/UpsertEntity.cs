@@ -10,6 +10,7 @@ using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.WebClient;
 using Stylelabs.M.Sdk.WebClient.Authentication;
 using System;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -114,7 +115,15 @@ namespace SY.ContentHub.AzureFunctions
 						if (property.Value != null && !string.IsNullOrEmpty(property.Value.ToString()))
 						{
 							var value = property.Value.ToObject(entityProperty.DataType);
-							entity.SetPropertyValue(entityProperty.Name, value);
+							try
+							{
+								entity.SetPropertyValue(entityProperty.Name, value);
+							}
+							catch (Exception ex) when (ex.Message == "Culture is required for culture sensitive properties.")
+							{
+								CultureInfo defaultCulture = await client.Cultures.GetDefaultCultureAsync();
+								entity.SetPropertyValue(entityProperty.Name, defaultCulture, value);
+							}
 						}
 					}
 				}

@@ -5,6 +5,7 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
+using Stylelabs.M.Framework.Essentials.LoadOptions;
 using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.WebClient;
 using Stylelabs.M.Sdk.WebClient.Authentication;
@@ -90,7 +91,7 @@ namespace SY.ContentHub.AzureFunctions
 					string.IsNullOrEmpty(requestObject.entitySearch.parentEntitySearchField.fieldValue)
 					|| string.IsNullOrEmpty(requestObject.entitySearch.childEntitySearchField.fieldValue)))
 				{
-					var message = $"Skipping relation creation as continueOnEmptySearchFields is set to true.  Parent entity search value: {requestObject.entitySearch.parentEntitySearchField.fieldValue}, Child entity search value: {requestObject.entitySearch.childEntitySearchField.fieldValue}";
+					var message = $"Skipping relation creation as continueOnEmptySearchFields is set to true. Relation Name: {requestObject.entityData.relationFieldName}, Parent entity search value: {requestObject.entitySearch.parentEntitySearchField.fieldValue}, Child entity search value: {requestObject.entitySearch.childEntitySearchField.fieldValue}";
 					log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
 					return new HttpResponseMessage(HttpStatusCode.OK)
 					{
@@ -124,52 +125,91 @@ namespace SY.ContentHub.AzureFunctions
 				if (parentEntity != null && parentEntity.Id != null && parentEntity.Id.HasValue
 					&& childEntity != null && childEntity.Id != null && childEntity.Id.HasValue)
 				{
+					log?.Info($"Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}");
+					IRelation relation = null;
 					string message = "";
-					var relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName);
-					if (relation != null)
-					{
-						var ids = relation.GetIds().ToList();
 
-						if (!ids.Contains(childEntity.Id.Value))
+					//relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName);
+					//log?.Info($"Generic Relation from parent: {relation}");
+
+					relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Parent);
+					log?.Info($"Parent Relation from parent: {relation}");
+					if (relation == null)
+					{
+						relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Child);
+						log?.Info($"Child Relation from child: {relation}");
+					}
+
+
+					//////////////////////////////////////////////////////////////////////
+
+					//relation = childEntity.GetRelation(requestObject.entityData.relationFieldName);
+					//log?.Info($"Generic Relation from child: {relation}");
+
+					//relation = childEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Parent);
+					//log?.Info($"Parent Relation from child: {relation}");
+
+					//relation = childEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Child);
+					//log?.Info($"Child Relation from child: {relation}");
+
+					//relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Parent);
+					//log?.Info($"Parent Relation: {relation}");
+					try
+					{
+						if (relation != null)
 						{
-							if (requestObject.deleted)
+							var ids = relation.GetIds().ToList();
+
+							if (!ids.Contains(childEntity.Id.Value))
 							{
-								message = $"Skipping relation add because it is marked deleted. Relation Name: {requestObject.entityData.relationFieldName}, Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
+								if (requestObject.deleted)
+								{
+									message = $"Skipping relation add because it is marked deleted. Relation Name: {requestObject.entityData.relationFieldName}, Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
+								}
+								else
+								{
+									ids.Add(childEntity.Id.Value);
+									relation.SetIds(ids);
+									long addedResult = await client.Entities.SaveAsync(parentEntity);
+									message = $"Successfully added relation. Relation Name: {requestObject.entityData.relationFieldName},Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
+								}
+
 							}
 							else
 							{
-								ids.Add(childEntity.Id.Value);
-								relation.SetIds(ids);
-								long addedResult = await client.Entities.SaveAsync(parentEntity);
-								message = $"Successfully added relation. Relation Name: {requestObject.entityData.relationFieldName},Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
+								if (requestObject.deleted)
+								{
+									ids.Remove(childEntity.Id.Value);
+									relation.SetIds(ids);
+									long deletedResultId = await client.Entities.SaveAsync(parentEntity);
+									message = $"Successfully deleted relation because it is marked deleted. Relation Name: {requestObject.entityData.relationFieldName},Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
+								}
+								else
+								{
+									message = $"Relation already exists - skipping. Relation Name: {requestObject.entityData.relationFieldName}, Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
+								}
 							}
 
+							log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
+							return new HttpResponseMessage(HttpStatusCode.OK)
+							{
+								Content = new StringContent(message)
+							};
 						}
 						else
 						{
-							if (requestObject.deleted)
-							{
-								ids.Remove(childEntity.Id.Value);
-								relation.SetIds(ids);
-								long deletedResultId = await client.Entities.SaveAsync(parentEntity);
-								message = $"Successfully deleted relation because it is marked deleted. Relation Name: {requestObject.entityData.relationFieldName},Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
-							}
-							else
-							{
-								message = $"Relation already exists - skipping. Relation Name: {requestObject.entityData.relationFieldName}, Parent Entity ID: {parentEntity.Id}, Child Entity ID: {childEntity.Id}";
-							}
-						}
+							relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Child);
+							log?.Info($"Child Relation: {relation}");
 
-						log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
-						return new HttpResponseMessage(HttpStatusCode.OK)
-						{
-							Content = new StringContent(message)
-						};
+							message = $"Relation not found. Parent Entity ID: {parentEntity.Id}, Relation Field Name: {requestObject.entityData.relationFieldName}";
+						}
 					}
-					else
+					catch (Exception ex)
 					{
-						message = $"Relation not found. Parent Entity ID: {parentEntity.Id}, Relation Field Name: {requestObject.entityData.relationFieldName}";
+						log?.Error($"Exception: Type: {ex.GetType()}, Message: {ex.Message}", ex, MethodBase.GetCurrentMethod().DeclaringType.Name);
+						throw;
 					}
+					
 
 					log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
 					return new HttpResponseMessage(HttpStatusCode.NotFound)
