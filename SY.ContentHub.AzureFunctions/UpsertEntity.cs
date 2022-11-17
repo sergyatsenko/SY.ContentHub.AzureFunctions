@@ -4,11 +4,11 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
 using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.WebClient;
 using Stylelabs.M.Sdk.WebClient.Authentication;
+using SY.ContentHub.AzureFunctions.Models;
 using System;
 using System.Globalization;
 using System.Net;
@@ -18,72 +18,41 @@ using System.Threading.Tasks;
 
 namespace SY.ContentHub.AzureFunctions
 {
-	public static class UpsertEntity
+	/// <summary>
+	/// Update an existing or create a new Entity in Content Hub
+	/// </summary>
+	public static partial class UpsertEntity
 	{
-		class EntitySearch
-		{
-			public SearchEntityRequestBase entitySearchField;
-		}
-
-		class Client
-		{
-			public string clientId;
-			public string clientSecret;
-			public string userName;
-			public string password;
-		}
-
-		class EntityProperty
-		{
-			public string name;
-			public string type;
-			public object value;
-		}
-
-		class RequestObject
-		{
-			public string baseUrl;
-			public Client client;
-			public EntitySearch entitySearch;
-			//public List<EntityProperty> properties;
-			public JObject properties;
-			//public dynamic entityData;
-			public void Validate()
-			{
-				if (string.IsNullOrEmpty(baseUrl)) throw new ArgumentException("baseUrl");
-				if (entitySearch == null) throw new ArgumentException("entitySearchField is required and cannot be empty");
-				if (entitySearch.entitySearchField == null) throw new ArgumentException("entitySearchField is required and cannot be emoty");
-				entitySearch.entitySearchField.Validate();
-			}
-		}
-
 		[FunctionName("UpsertEntity")]
 		public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage req, TraceWriter log)
 		{
+			//Read and parse request payload
 			log.Info("UpsertEntity invoked.", MethodBase.GetCurrentMethod().DeclaringType.Name);
 			var content = req.Content;
 			string requestBody = content.ReadAsStringAsync().Result;
 			log?.Info($"Request body: {requestBody}", MethodBase.GetCurrentMethod().DeclaringType.Name);
-			var requestObject = JsonConvert.DeserializeObject<RequestObject>(requestBody);
-			
+			var requestObject = JsonConvert.DeserializeObject<UpsertEntityRequest>(requestBody);
+
 			try
 			{
-				Uri endpoint = new Uri(requestObject.baseUrl);
-				//SearchResultsResponse searchResponseObject = null;
+				//Initialize CH Web SDK client
+				var clientInfo = Utils.ExtractClientInfo(req.Headers);
+				Uri endpoint = new Uri(clientInfo.baseUrl);
 				OAuthPasswordGrant oauth = new OAuthPasswordGrant
 				{
-					ClientId = requestObject.client.clientId,
-					ClientSecret = requestObject.client.clientSecret,
-					UserName = requestObject.client.userName,
-					Password = requestObject.client.password
+					ClientId = clientInfo.clientId,
+					ClientSecret = clientInfo.clientSecret,
+					UserName = clientInfo.userName,
+					Password = clientInfo.password
 				};
 
 				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
 
-				IEntity entity = await Utils.SearchSingleEntity(client, 
-					requestObject.entitySearch.entitySearchField.fieldName, 
-					requestObject.entitySearch.entitySearchField.fieldValue, 
-					requestObject.entitySearch.entitySearchField.definitionName, 
+				//Query for single Entity that matches the search criteria
+				IEntity entity = await Utils.SearchSingleEntity(client,
+					requestObject.entitySearch.entitySearchField.fieldName,
+					requestObject.entitySearch.entitySearchField.fieldValue,
+					requestObject.entitySearch.entitySearchField.definitionName,
 					EntityLoadConfiguration.Full, log);
 
 				var isNewEntity = false;
@@ -93,10 +62,10 @@ namespace SY.ContentHub.AzureFunctions
 					isNewEntity = true;
 				}
 
+				//Update property valeus with data from the request payload
 				foreach (var property in requestObject.properties)
 				{
 					var key = property.Key;
-					//var value = property.Value.ToString();
 					log?.Info($"Property Key: {key}, Value: {property.Value?.ToString()}", MethodBase.GetCurrentMethod().DeclaringType.Name);
 					IProperty entityProperty = entity.GetProperty(key);
 					if (entityProperty == null)
@@ -128,6 +97,7 @@ namespace SY.ContentHub.AzureFunctions
 					}
 				}
 
+				//Save Entity changes back into Content Hub
 				long id = await client.Entities.SaveAsync(entity);
 				var changeKind = isNewEntity ? "created" : "updated";
 				log?.Info($"Successfully {changeKind} entity. ID: {id}", MethodBase.GetCurrentMethod().DeclaringType.Name);

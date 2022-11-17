@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace SY.ContentHub.AzureFunctions
+namespace SY.ContentHub.AzureFunctions.Models
 {
-	class SearchEntityRequestBase
+	public class SearchEntityRequestBase
 	{
 		public string definitionName;
 		public string fieldName;

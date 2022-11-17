@@ -9,8 +9,8 @@ using Stylelabs.M.Framework.Essentials.LoadOptions;
 using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.WebClient;
 using Stylelabs.M.Sdk.WebClient.Authentication;
+using SY.ContentHub.AzureFunctions.Models;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -19,68 +19,20 @@ using System.Threading.Tasks;
 
 namespace SY.ContentHub.AzureFunctions
 {
-	public static class UpsertRelation
+	/// <summary>
+	/// Update an existing or create a new relation between two specified entities in Content Hub
+	/// </summary>
+	public static partial class UpsertRelation
 	{
-		class Client
-		{
-			public string clientId;
-			public string clientSecret;
-			public string userName;
-			public string password;
-		}
-
-		class EntitySearch
-		{
-			public SearchEntityRequestBase parentEntitySearchField;
-			public SearchEntityRequestBase childEntitySearchField;
-		}
-
-		class EntityData
-		{
-			public string relationFieldName;
-		}
-
-		public class Child
-		{
-			public string href { get; set; }
-		}
-
-		public class Root
-		{
-			public List<Child> children { get; set; }
-		}
-
-
-		class RequestObject
-		{
-			public string baseUrl;
-			public Client client;
-			public EntitySearch entitySearch;
-			public EntityData entityData;
-			public bool keepExistingRelations = false;
-			public bool deleted = false;
-			public bool continueOnEmptySearchFields = false;
-			public bool continueOnNoFoundEntities = false;
-			public void Validate()
-			{
-				if (string.IsNullOrEmpty(baseUrl)) throw new ArgumentException("baseUrl");
-				if (entityData == null) throw new ArgumentException("entityData is required and cannot be empty.");
-				if (string.IsNullOrEmpty(entityData.relationFieldName)) throw new ArgumentException("entityData.relationFieldName");
-				if (entitySearch?.parentEntitySearchField == null) throw new ArgumentException("parentEntitySearchField");
-				if (entitySearch?.childEntitySearchField == null) throw new ArgumentException("childEntitySearchField");
-				entitySearch.parentEntitySearchField.Validate(continueOnEmptySearchFields);
-				entitySearch.childEntitySearchField.Validate(continueOnEmptySearchFields);
-			}
-		}
-
 		[FunctionName("UpsertRelation")]
 		public static async Task<HttpResponseMessage> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestMessage req, TraceWriter log)
 		{
+			//Read and parse request payload
 			log.Info("UpsertRelation invoked.");
 			var content = req.Content;
 			string requestBody = content.ReadAsStringAsync().Result;
 			log.Info($"Request body: {requestBody}");
-			var requestObject = JsonConvert.DeserializeObject<RequestObject>(requestBody);
+			var requestObject = JsonConvert.DeserializeObject<UpsertRelationRequest>(requestBody);
 
 			try
 			{
@@ -99,23 +51,27 @@ namespace SY.ContentHub.AzureFunctions
 					};
 				}
 
-				Uri endpoint = new Uri(requestObject.baseUrl);
+				//Initialize CH Web SDK client
+				var clientInfo = Utils.ExtractClientInfo(req.Headers);
+				Uri endpoint = new Uri(clientInfo.baseUrl);
 				OAuthPasswordGrant oauth = new OAuthPasswordGrant
 				{
-					ClientId = requestObject.client.clientId,
-					ClientSecret = requestObject.client.clientSecret,
-					UserName = requestObject.client.userName,
-					Password = requestObject.client.password
+					ClientId = clientInfo.clientId,
+					ClientSecret = clientInfo.clientSecret,
+					UserName = clientInfo.userName,
+					Password = clientInfo.password
 				};
 
 				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
 
+				//Query for single Entity that matches the search criteria for parent entity for the relation
 				IEntity parentEntity = await Utils.SearchSingleEntity(client,
 					requestObject.entitySearch.parentEntitySearchField.fieldName,
 					requestObject.entitySearch.parentEntitySearchField.fieldValue,
 					requestObject.entitySearch.parentEntitySearchField.definitionName,
 					EntityLoadConfiguration.Full, log);
 
+				//Query for single Entity that matches the search criteria for child entity for the relation
 				IEntity childEntity = await Utils.SearchSingleEntity(client,
 					requestObject.entitySearch.childEntitySearchField.fieldName,
 					requestObject.entitySearch.childEntitySearchField.fieldValue,
@@ -129,9 +85,7 @@ namespace SY.ContentHub.AzureFunctions
 					IRelation relation = null;
 					string message = "";
 
-					//relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName);
-					//log?.Info($"Generic Relation from parent: {relation}");
-
+					//Get a hold of Relation field in Parent entity
 					relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Parent);
 					log?.Info($"Parent Relation from parent: {relation}");
 					if (relation == null)
@@ -140,26 +94,13 @@ namespace SY.ContentHub.AzureFunctions
 						log?.Info($"Child Relation from child: {relation}");
 					}
 
-
-					//////////////////////////////////////////////////////////////////////
-
-					//relation = childEntity.GetRelation(requestObject.entityData.relationFieldName);
-					//log?.Info($"Generic Relation from child: {relation}");
-
-					//relation = childEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Parent);
-					//log?.Info($"Parent Relation from child: {relation}");
-
-					//relation = childEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Child);
-					//log?.Info($"Child Relation from child: {relation}");
-
-					//relation = parentEntity.GetRelation(requestObject.entityData.relationFieldName, RelationRole.Parent);
-					//log?.Info($"Parent Relation: {relation}");
 					try
 					{
+						//Update, create or delete the relation between entities, based on request values
 						if (relation != null)
 						{
 							var ids = relation.GetIds().ToList();
-
+							//If relation already exist then update/add or delete when "deleted" field is set to true in the request
 							if (!ids.Contains(childEntity.Id.Value))
 							{
 								if (requestObject.deleted)
@@ -175,6 +116,7 @@ namespace SY.ContentHub.AzureFunctions
 								}
 
 							}
+							//If relation don't exist then add it, unless the "deleted" field is set to true in the request
 							else
 							{
 								if (requestObject.deleted)
@@ -209,7 +151,7 @@ namespace SY.ContentHub.AzureFunctions
 						log?.Error($"Exception: Type: {ex.GetType()}, Message: {ex.Message}", ex, MethodBase.GetCurrentMethod().DeclaringType.Name);
 						throw;
 					}
-					
+
 
 					log?.Info(message, MethodBase.GetCurrentMethod().DeclaringType.Name);
 					return new HttpResponseMessage(HttpStatusCode.NotFound)

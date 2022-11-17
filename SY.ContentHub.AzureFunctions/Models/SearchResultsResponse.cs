@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
-namespace SY.ContentHub.AzureFunctions
+namespace SY.ContentHub.AzureFunctions.Models
 {
 	class Item
 	{

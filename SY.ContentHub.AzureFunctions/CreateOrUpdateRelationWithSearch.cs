@@ -4,6 +4,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
+using SY.ContentHub.AzureFunctions.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,30 +14,8 @@ using System.Threading.Tasks;
 
 namespace SY.ContentHub.AzureFunctions
 {
-	public static class CreateOrUpdateRelationWithSearch
+	public static partial class CreateOrUpdateRelationWithSearch
 	{
-		class EntitySearch
-		{
-			public SearchEntityRequestBase parentEntitySearchField;
-			public SearchEntityRequestBase childEntitySearchField;
-		}
-
-		class EntityData
-		{
-			public string relationFieldName;
-		}
-
-		public class Child
-		{
-			public string href { get; set; }
-		}
-
-		public class Root
-		{
-			public List<Child> children { get; set; }
-		}
-
-
 		class RequestObject
 		{
 			public string baseUrl;

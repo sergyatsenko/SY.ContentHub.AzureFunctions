@@ -12,6 +12,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
+using SY.ContentHub.AzureFunctions.Models;
 
 namespace SY.ContentHub.AzureFunctions
 {
@@ -24,6 +25,18 @@ namespace SY.ContentHub.AzureFunctions
 	}
 	public static class Utils
 	{
+		public static Client ExtractClientInfo(HttpRequestHeaders headers)
+		{
+			return new Client
+			{
+				baseUrl = GetHeaderValue(headers, "baseUrl"),
+				clientId = GetHeaderValue(headers, "clientId"),
+				clientSecret = GetHeaderValue(headers, "clientSecret"),
+				userName = GetHeaderValue(headers, "userName"),
+				password = GetHeaderValue(headers, "password"),
+			};
+		}
+
 		public static string GetHeaderValue(HttpRequestHeaders headers, string key, bool throwErrorWhenEmpty = true)
 		{
 			if (!headers.TryGetValues(key, out IEnumerable<string> values) && throwErrorWhenEmpty)
