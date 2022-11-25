@@ -1,9 +1,29 @@
 //#r "Newtonsoft.Json"
 
+//using Microsoft.Azure.WebJobs;
+//using Stylelabs.M.Base.Querying.Linq;
+//using Microsoft.Azure.WebJobs.Extensions.Http;
+//using Microsoft.Azure.WebJobs.Host;
+//using Newtonsoft.Json;
+//using Stylelabs.M.Framework.Essentials.LoadConfigurations;
+//using Stylelabs.M.Sdk.Contracts.Base;
+//using Stylelabs.M.Sdk.WebClient;
+//using Stylelabs.M.Sdk.WebClient.Authentication;
+//using SY.ContentHub.AzureFunctions.Models;
+//using System;
+//using System.Collections.Generic;
+//using System.Globalization;
+//using System.Net;
+//using System.Net.Http;
+//using System.Reflection;
+//using System.Threading.Tasks;
+//using static Stylelabs.M.Sdk.Errors;
+
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
+using Stylelabs.M.Base.Querying.Linq;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
 using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.WebClient;
@@ -11,6 +31,7 @@ using Stylelabs.M.Sdk.WebClient.Authentication;
 using SY.ContentHub.AzureFunctions.Models;
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -48,12 +69,33 @@ namespace SY.ContentHub.AzureFunctions
 
 				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
 
+				IEntity entity;
+				
+				if (string.IsNullOrEmpty(requestObject.entitySearch.entitySearchField.fieldValue) || string.IsNullOrEmpty(requestObject.entitySearch.entitySearchField.fieldName))
+				{
+					entity = await Utils.SearchSingleEntity(client,
+											(entities =>
+											from e in entities
+											where e.DefinitionName == requestObject.entitySearch.entitySearchField.definitionName
+											select e),
+											EntityLoadConfiguration.Full, log);
+				}
+				else
+				{
+					entity = await Utils.SearchSingleEntity(client,
+											(entities =>
+											from e in entities
+											where e.Property(requestObject.entitySearch.entitySearchField.fieldName) == requestObject.entitySearch.entitySearchField.fieldValue
+											where e.DefinitionName == requestObject.entitySearch.entitySearchField.definitionName
+											select e),
+											EntityLoadConfiguration.Full, log);
+				}
 				//Query for single Entity that matches the search criteria
-				IEntity entity = await Utils.SearchSingleEntity(client,
-					requestObject.entitySearch.entitySearchField.fieldName,
-					requestObject.entitySearch.entitySearchField.fieldValue,
-					requestObject.entitySearch.entitySearchField.definitionName,
-					EntityLoadConfiguration.Full, log);
+				//IEntity entity = await Utils.SearchSingleEntity(client,
+				//	requestObject.entitySearch.entitySearchField.fieldName,
+				//	requestObject.entitySearch.entitySearchField.fieldValue,
+				//	requestObject.entitySearch.entitySearchField.definitionName,
+				//	EntityLoadConfiguration.Full, log);
 
 				var isNewEntity = false;
 				if (entity == null)

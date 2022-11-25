@@ -4,6 +4,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
+using Stylelabs.M.Base.Querying.Linq;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
 using Stylelabs.M.Framework.Essentials.LoadOptions;
 using Stylelabs.M.Sdk.Contracts.Base;
@@ -16,6 +17,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
+using static Stylelabs.M.Sdk.Errors;
 
 namespace SY.ContentHub.AzureFunctions
 {
@@ -64,19 +66,36 @@ namespace SY.ContentHub.AzureFunctions
 
 				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
 
-				//Query for single Entity that matches the search criteria for parent entity for the relation
-				IEntity parentEntity = await Utils.SearchSingleEntity(client,
-					requestObject.entitySearch.parentEntitySearchField.fieldName,
-					requestObject.entitySearch.parentEntitySearchField.fieldValue,
-					requestObject.entitySearch.parentEntitySearchField.definitionName,
-					EntityLoadConfiguration.Full, log);
 
-				//Query for single Entity that matches the search criteria for child entity for the relation
+				IEntity parentEntity = await Utils.SearchSingleEntity(client,
+											(entities =>
+											from e in entities
+											where e.Property(requestObject.entitySearch.parentEntitySearchField.fieldName) == requestObject.entitySearch.parentEntitySearchField.fieldValue
+											where e.DefinitionName == requestObject.entitySearch.parentEntitySearchField.definitionName
+											select e),
+											EntityLoadConfiguration.Full, log);
+
 				IEntity childEntity = await Utils.SearchSingleEntity(client,
-					requestObject.entitySearch.childEntitySearchField.fieldName,
-					requestObject.entitySearch.childEntitySearchField.fieldValue,
-					requestObject.entitySearch.childEntitySearchField.definitionName,
-					EntityLoadConfiguration.Minimal, log);
+											(entities =>
+											from e in entities
+											where e.Property(requestObject.entitySearch.childEntitySearchField.fieldName) == requestObject.entitySearch.childEntitySearchField.fieldValue
+											where e.DefinitionName == requestObject.entitySearch.childEntitySearchField.definitionName
+											select e),
+											EntityLoadConfiguration.Full, log);
+
+				////Query for single Entity that matches the search criteria for parent entity for the relation
+				//IEntity parentEntity = await Utils.SearchSingleEntity(client,
+				//	requestObject.entitySearch.parentEntitySearchField.fieldName,
+				//	requestObject.entitySearch.parentEntitySearchField.fieldValue,
+				//	requestObject.entitySearch.parentEntitySearchField.definitionName,
+				//	EntityLoadConfiguration.Full, log);
+
+				////Query for single Entity that matches the search criteria for child entity for the relation
+				//IEntity childEntity = await Utils.SearchSingleEntity(client,
+				//	requestObject.entitySearch.childEntitySearchField.fieldName,
+				//	requestObject.entitySearch.childEntitySearchField.fieldValue,
+				//	requestObject.entitySearch.childEntitySearchField.definitionName,
+				//	EntityLoadConfiguration.Minimal, log);
 
 				if (parentEntity != null && parentEntity.Id != null && parentEntity.Id.HasValue
 					&& childEntity != null && childEntity.Id != null && childEntity.Id.HasValue)

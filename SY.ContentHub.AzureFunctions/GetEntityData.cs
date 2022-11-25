@@ -36,7 +36,9 @@ namespace SY.ContentHub.AzureFunctions
             long targetIdValue = (long)data.SelectToken(targetEntityIdJsonPath);
             log.Info($"targetIdValue: {targetIdValue}");
 
-            Uri endpoint = new Uri(Utils.GetHeaderValue(req.Headers, "ContentHubUrl")); // "https://xc403.stylelabsdemo.com/");
+            string baseUrl = Utils.GetHeaderValue(req.Headers, "ContentHubUrl");
+
+			Uri endpoint = new Uri(baseUrl);
 
             OAuthPasswordGrant oauth = new OAuthPasswordGrant
             {
@@ -58,49 +60,12 @@ namespace SY.ContentHub.AzureFunctions
                 };
             }
 
-            var relations = new Dictionary<string, List<dynamic>>();
-            foreach (var entityRelation in entityRelations)
-            {
-                if (!string.IsNullOrEmpty(entityRelation))
-                {
-                    var relation = entity.GetRelation(entityRelation);
-                    var relatedIds = relation?.GetIds();
-                    if (relatedIds.Count > 0)
-                    {
-                        var relationData = new List<dynamic>();
-                        foreach (var relatedId in relatedIds)
-                        {
-                            IEntity relatedEntity = await client.Entities.GetAsync(relatedId, EntityLoadConfiguration.Full);
-                            if (relatedEntity != null)
-                            {
-                                var entityData = new
-                                { 
-                                    Properties = ExtractEntityData(relatedEntity),
-                                    Renditions = entity.Renditions
-                                };
-                                relationData.Add(entityData);
-                                //relationData.Add(ExtractEntityData(relatedEntity));
-                            }
-                        }
-                        if (relationData.Count > 0)
-                        {
-                            relations.Add(entityRelation, relationData);
-                        }
-                    }
-                }
-            }
-
-            //var entityJson = JsonConvert.SerializeObject(entity);
-            //log.Info($"entityJson: {entityJson}");
-            //var relationsJson = JsonConvert.SerializeObject(relations);
-            //log.Info($"relationsJson: {relationsJson}");
-
             var result = new
             {
-                Properties = ExtractEntityData(entity),
+                Properties = Utils.ExtractEntityData(entity),
                 Renditions = entity.Renditions,
-                Relations = relations
-            };
+                Relations = await Utils.GetRelatedEntities(client, entity, null, log)
+			};
             var resultJson = JsonConvert.SerializeObject(result);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -108,106 +73,6 @@ namespace SY.ContentHub.AzureFunctions
                 Content = new StringContent(resultJson, Encoding.UTF8, "application/json")
             };
 
-            //var value = entity.GetPropertyValue<string>("ProductName");
-            //log.LogInformation($"Entity product name: {value}");
-            //foreach (var rel in entity.Relations)
-            //{
-            //    log.LogInformation($"Relation name: {rel.Name}, Relation definition type: {rel.DefinitionType}");
-            //}
-            //IRelation relation = entity.GetRelation("PCMProductFamilyToProduct");
-            //var relatedIds = relation?.GetIds();
-            //string relatedValues = "";
-            //if (relatedIds != null)
-            //{
-            //    foreach (var relatedId in relatedIds)
-            //    {
-            //        log.LogInformation($"PCMProductFamilyToProduct related ID: {relatedId}");
-            //        IEntity relatedEntity = await client.Entities.GetAsync(relatedId);
-            //        if (relatedEntity != null)
-            //        {
-            //            var relatedValue = relatedEntity.GetPropertyValue<string>("ProductFamilyName");
-            //            if (relatedValue != null)
-            //            {
-            //                relatedValues += relatedValue;
-            //            }
-            //        }
-            //    }
-            //}
-            //else
-            //{
-            //    log.LogInformation("no PCMProductFamilyToProduct relations found");
-            //}
-
-            //relation = entity.GetRelation("PCMProductToMasterAsset");
-            //relatedIds = relation?.GetIds();
-
-            //if (relatedIds != null)
-            //{
-            //    foreach (var relatedId in relatedIds)
-            //    {
-            //        log.LogInformation($"PCMProductToMasterAsset related ID: {relatedId}");
-            //        IEntity relatedEntity = await client.Entities.GetAsync(relatedId);
-            //        if (relatedEntity != null)
-            //        {
-            //            var relatedValue = relatedEntity.GetPropertyValue<string>("ProductFamilyName");
-            //            if (relatedValue != null)
-            //            {
-            //                relatedValues += relatedValue;
-            //            }
-            //        }
-            //    }
-            //}
-            //else
-            //{
-            //    log.LogInformation("no PCMProductFamilyToProduct relations found");
-            //}
-            //string name = req.Query["name"];
-
-            //string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            //dynamic data = JsonConvert.DeserializeObject(requestBody);
-            //name = name ?? data?.name;
-
-            //string responseMessage = string.IsNullOrEmpty(name)
-            //    ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-            //    : $"Hello, {name}. This HTTP triggered function executed successfully.";
-
-            //return new OkObjectResult(string.Format("productName: {0}, related values: {1}", value, relatedValues));
-
         }
-
-        private static Dictionary<string, object> ExtractEntityData(IEntity entity)
-        {
-            var e = new Dictionary<string, object>();
-            e.Add("Id", entity.Id);
-            e.Add("Identifier", entity.Identifier);
-            e.Add("DefinitionName", entity.DefinitionName);
-            e.Add("CreatedBy", entity.CreatedBy);
-            e.Add("CreatedOn", entity.CreatedOn);
-            e.Add("IsDirty", entity.IsDirty);
-            e.Add("IsNew", entity.IsNew);
-            e.Add("IsRootTaxonomyItem", entity.IsRootTaxonomyItem);
-            e.Add("IsPathRoot", entity.IsPathRoot);
-            e.Add("IsSystemOwned", entity.IsSystemOwned);
-            e.Add("Version", entity.Version);
-            e.Add("Cultures", entity.Cultures);
-            foreach (var property in entity.Properties)
-            {
-                //var propertyValue = entity.GetProperty<ICultureInsensitiveProperty>(property.Name)?.GetValue();
-                try
-                {
-                    var propertyValue = entity.GetPropertyValue(property.Name);
-                    e.Add(property.Name, propertyValue);
-                }
-                catch (Exception ex) when (ex.Message == "Culture is required for culture sensitive properties.")
-                {
-                    var propertyValue = entity.GetPropertyValue(property.Name, CultureInfo.GetCultureInfo("en-US"));
-                    e.Add(property.Name, propertyValue);
-                }
-               
-            }
-            
-            return e;
-        }
-
     }
 }
