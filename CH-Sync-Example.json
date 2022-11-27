@@ -1,0 +1,489 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Initialize_Responses_Array": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "Responses",
+                            "type": "array"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Parse_Object_Name_JSON": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Parse_Object_Name_JSON": {
+                "inputs": {
+                    "content": "@triggerBody()",
+                    "schema": {
+                        "properties": {
+                            "object_name": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {},
+                "type": "ParseJson"
+            },
+            "Switch": {
+                "cases": {
+                    "catalog": {
+                        "actions": {
+                            "product_catalog._Append_to_array_variable": {
+                                "inputs": {
+                                    "name": "Responses",
+                                    "value": {
+                                        "product family. Upsert Entity": {
+                                            "body": "@body('product_catalog._Upsert_Entity')",
+                                            "status_code": "@outputs('product_catalog._Upsert_Entity')['statusCode']"
+                                        }
+                                    }
+                                },
+                                "runAfter": {
+                                    "product_catalog._Upsert_Entity": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "AppendToArrayVariable"
+                            },
+                            "product_catalog._Parse_JSON": {
+                                "inputs": {
+                                    "content": "@triggerBody()",
+                                    "schema": {
+                                        "properties": {
+                                            "fields": {
+                                                "properties": {
+                                                    "catalog_description": {
+                                                        "type": "string"
+                                                    },
+                                                    "catalog_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "catalog_label": {
+                                                        "type": "string"
+                                                    },
+                                                    "catalog_name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "object_name": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "runAfter": {},
+                                "type": "ParseJson"
+                            },
+                            "product_catalog._Response": {
+                                "inputs": {
+                                    "body": "@variables('Responses')",
+                                    "statusCode": 200
+                                },
+                                "kind": "Http",
+                                "runAfter": {
+                                    "product_catalog._Append_to_array_variable": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Response"
+                            },
+                            "product_catalog._Upsert_Entity": {
+                                "inputs": {
+                                    "body": {
+                                        "entitySearch": {
+                                            "entitySearchField": {
+                                                "definitionName": "M.PCM.Catalog",
+                                                "fieldName": "catalog_id",
+                                                "fieldType": "String",
+                                                "fieldValue": "@{body('product_catalog._Parse_JSON')?['fields']?['catalog_id']}",
+                                                "isStringValue": true
+                                            }
+                                        },
+                                        "entitydefinition": {
+                                            "href": "@{parameters('baseUrl')}/api/entitydefinitions/M.PCM.Catalog"
+                                        },
+                                        "properties": {
+                                            "CatalogDescription": "@{body('product_catalog._Parse_JSON')?['fields']?['catalog_description']}",
+                                            "CatalogLabel": "@{body('product_catalog._Parse_JSON')?['fields']?['catalog_label']}",
+                                            "CatalogName": "@{body('product_catalog._Parse_JSON')?['fields']?['catalog_name']}",
+                                            "catalog_id": "@{body('product_catalog._Parse_JSON')?['fields']?['catalog_id']}"
+                                        }
+                                    },
+                                    "function": {
+                                        "id": "/subscriptions/d55a2ee0-7907-4196-bf1d-72ce970242eb/resourceGroups/C-hub-RD/providers/Microsoft.Web/sites/contenthubfunctions/functions/UpsertEntity"
+                                    },
+                                    "headers": {
+                                        "baseUrl": "@parameters('baseUrl')",
+                                        "clientId": "@parameters('ClientId')",
+                                        "clientSecret": "@parameters('ClientSecret')",
+                                        "password": "@parameters('password')",
+                                        "userName": "@parameters('userName')"
+                                    },
+                                    "method": "POST"
+                                },
+                                "runAfter": {
+                                    "product_catalog._Parse_JSON": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Function"
+                            }
+                        },
+                        "case": "catalog"
+                    },
+                    "product": {
+                        "actions": {
+                            "product._Append_to_array_variable": {
+                                "inputs": {
+                                    "name": "Responses",
+                                    "value": {
+                                        "product family. Upsert Entity": {
+                                            "body": "@body('product._Upsert_Entity')",
+                                            "status_code": "@outputs('product._Upsert_Entity')['statusCode']"
+                                        }
+                                    }
+                                },
+                                "runAfter": {
+                                    "product._Upsert_Entity": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "AppendToArrayVariable"
+                            },
+                            "product._Parse_JSON": {
+                                "inputs": {
+                                    "content": "@triggerBody()",
+                                    "schema": {
+                                        "properties": {
+                                            "fields": {
+                                                "properties": {
+                                                    "catalog_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_family_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_label": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_long_description": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_number": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_short_description": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "object_name": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "runAfter": {},
+                                "type": "ParseJson"
+                            },
+                            "product._Response": {
+                                "inputs": {
+                                    "body": "@variables('Responses')",
+                                    "statusCode": 200
+                                },
+                                "kind": "Http",
+                                "runAfter": {
+                                    "product._Upsert_Relation_to_Product_Family": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Response"
+                            },
+                            "product._Upsert_Entity": {
+                                "inputs": {
+                                    "body": {
+                                        "entitySearch": {
+                                            "entitySearchField": {
+                                                "definitionName": "M.PCM.Product",
+                                                "fieldName": "product_id",
+                                                "fieldType": "String",
+                                                "fieldValue": "@{body('product._Parse_JSON')?['fields']?['product_id']}",
+                                                "isStringValue": true
+                                            }
+                                        },
+                                        "entitydefinition": {
+                                            "href": "@{parameters('baseUrl')}/api/entitydefinitions/M.PCM.Product"
+                                        },
+                                        "properties": {
+                                            "CatalogId": "@{body('product._Parse_JSON')?['fields']?['catalog_id']}",
+                                            "ProductFamilyId": "@{body('product._Parse_JSON')?['fields']?['product_family_id']}",
+                                            "ProductLabel": "@{body('product._Parse_JSON')?['fields']?['product_label']}",
+                                            "ProductLongDescription": "@{body('product._Parse_JSON')?['fields']?['product_long_description']}",
+                                            "ProductName": "@{body('product._Parse_JSON')?['fields']?['product_name']}",
+                                            "ProductNumber": "@{body('product._Parse_JSON')?['fields']?['product_number']}",
+                                            "ProductShortDescription": "@{body('product._Parse_JSON')?['fields']?['product_short_description']}",
+                                            "product_id": "@{body('product._Parse_JSON')?['fields']?['product_id']}"
+                                        }
+                                    },
+                                    "function": {
+                                        "id": "/subscriptions/d55a2ee0-7907-4196-bf1d-72ce970242eb/resourceGroups/C-hub-RD/providers/Microsoft.Web/sites/contenthubfunctions/functions/UpsertEntity"
+                                    },
+                                    "headers": {
+                                        "baseUrl": "@parameters('baseUrl')",
+                                        "clientId": "@parameters('ClientId')",
+                                        "clientSecret": "@parameters('ClientSecret')",
+                                        "password": "@parameters('password')",
+                                        "userName": "@parameters('userName')"
+                                    },
+                                    "method": "POST"
+                                },
+                                "runAfter": {
+                                    "product._Parse_JSON": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Function"
+                            },
+                            "product._Upsert_Relation_to_Product_Family": {
+                                "inputs": {
+                                    "body": {
+                                        "continueOnEmptySearchFields": true,
+                                        "continueOnNoFoundEntities": true,
+                                        "deleted": false,
+                                        "entityData": {
+                                            "relationFieldName": "PCMProductFamilyToProduct"
+                                        },
+                                        "entitySearch": {
+                                            "childEntitySearchField": {
+                                                "definitionName": "M.PCM.Product",
+                                                "fieldName": "ProductId",
+                                                "fieldType": "String",
+                                                "fieldValue": "@{body('product._Parse_JSON')?['fields']?['product_id']}",
+                                                "isStringValue": true
+                                            },
+                                            "parentEntitySearchField": {
+                                                "definitionName": "M.PCM.ProductFamily",
+                                                "fieldName": "ProductFamilyId",
+                                                "fieldType": "String",
+                                                "fieldValue": "@{body('product._Parse_JSON')?['fields']?['product_family_id']}",
+                                                "isStringValue": true
+                                            }
+                                        },
+                                        "keepExistingRelations": true
+                                    },
+                                    "function": {
+                                        "id": "/subscriptions/d55a2ee0-7907-4196-bf1d-72ce970242eb/resourceGroups/C-hub-RD/providers/Microsoft.Web/sites/contenthubfunctions/functions/UpsertRelation"
+                                    },
+                                    "headers": {
+                                        "baseUrl": "@parameters('baseUrl')",
+                                        "clientId": "@parameters('ClientId')",
+                                        "clientSecret": "@parameters('ClientSecret')",
+                                        "password": "@parameters('password')",
+                                        "userName": "@parameters('userName')"
+                                    },
+                                    "method": "POST"
+                                },
+                                "runAfter": {
+                                    "product._Append_to_array_variable": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Function"
+                            }
+                        },
+                        "case": "product"
+                    },
+                    "product_family": {
+                        "actions": {
+                            "product_family._Append_to_array_variable": {
+                                "inputs": {
+                                    "name": "Responses",
+                                    "value": {
+                                        "product family. Upsert Entity": {
+                                            "body": "@body('product_family._Upsert_Entity')",
+                                            "status_code": "@outputs('product_family._Upsert_Entity')['statusCode']"
+                                        }
+                                    }
+                                },
+                                "runAfter": {
+                                    "product_family._Upsert_Entity": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "AppendToArrayVariable"
+                            },
+                            "product_family._Parse_JSON": {
+                                "inputs": {
+                                    "content": "@triggerBody()",
+                                    "schema": {
+                                        "properties": {
+                                            "fields": {
+                                                "properties": {
+                                                    "product_family_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_family_label": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_family_long_description": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_family_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "product_family_short_description": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "object_name": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "runAfter": {},
+                                "type": "ParseJson"
+                            },
+                            "product_family._Response": {
+                                "inputs": {
+                                    "body": "@variables('Responses')",
+                                    "statusCode": 200
+                                },
+                                "kind": "Http",
+                                "runAfter": {
+                                    "product_family._Append_to_array_variable": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Response"
+                            },
+                            "product_family._Upsert_Entity": {
+                                "inputs": {
+                                    "body": {
+                                        "entitySearch": {
+                                            "entitySearchField": {
+                                                "definitionName": "M.PCM.ProductFamily",
+                                                "fieldName": "product_family_id",
+                                                "fieldType": "String",
+                                                "fieldValue": "@{body('product_family._Parse_JSON')?['fields']?['product_family_id']}",
+                                                "isStringValue": true
+                                            }
+                                        },
+                                        "entitydefinition": {
+                                            "href": "@{parameters('baseUrl')}/api/entitydefinitions/M.PCM.Product"
+                                        },
+                                        "properties": {
+                                            "ProductFamilyLabel": "@{body('product_family._Parse_JSON')?['fields']?['product_family_label']}",
+                                            "ProductFamilyLongDescription": "@{body('product_family._Parse_JSON')?['fields']?['product_family_long_description']}",
+                                            "ProductFamilyName": "@{body('product_family._Parse_JSON')?['fields']?['product_family_name']}",
+                                            "ProductFamilyShortDescription": "@{body('product_family._Parse_JSON')?['fields']?['product_family_short_description']}",
+                                            "product_family_id": "@{body('product_family._Parse_JSON')?['fields']?['product_family_id']}"
+                                        }
+                                    },
+                                    "function": {
+                                        "id": "/subscriptions/d55a2ee0-7907-4196-bf1d-72ce970242eb/resourceGroups/C-hub-RD/providers/Microsoft.Web/sites/contenthubfunctions/functions/UpsertEntity"
+                                    },
+                                    "headers": {
+                                        "baseUrl": "@parameters('baseUrl')",
+                                        "clientId": "@parameters('ClientId')",
+                                        "clientSecret": "@parameters('ClientSecret')",
+                                        "password": "@parameters('password')",
+                                        "userName": "@parameters('userName')"
+                                    },
+                                    "method": "POST"
+                                },
+                                "runAfter": {
+                                    "product_family._Parse_JSON": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "Function"
+                            }
+                        },
+                        "case": "product_family"
+                    }
+                },
+                "default": {
+                    "actions": {
+                        "Response": {
+                            "inputs": {
+                                "body": {
+                                    "error": "Syncing an object with type '@{body('Parse_Object_Name_JSON')?['object_name']}' is not supported"
+                                },
+                                "statusCode": 501
+                            },
+                            "kind": "Http",
+                            "runAfter": {},
+                            "type": "Response"
+                        }
+                    }
+                },
+                "expression": "@body('Parse_Object_Name_JSON')?['object_name']",
+                "runAfter": {
+                    "Initialize_Responses_Array": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Switch"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "ClientId": {
+                "defaultValue": "YourClient",
+                "type": "String"
+            },
+            "ClientSecret": {
+                "defaultValue": "YourSecret",
+                "type": "String"
+            },
+            "baseUrl": {
+                "defaultValue": "https://yoursitecoresandbox.cloud",
+                "type": "String"
+            },
+            "password": {
+                "defaultValue": "yourpassword",
+                "type": "String"
+            },
+            "userName": {
+                "defaultValue": "YourUser",
+                "type": "String"
+            }
+        },
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "method": "POST",
+                    "schema": {}
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    },
+    "parameters": {}
+}

@@ -1,0 +1,175 @@
+{
+	"info": {
+		"_postman_id": "2fa55f01-a363-46d1-974f-6597c789cff0",
+		"name": "Logic App Example Calls",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "3189063"
+	},
+	"item": [
+		{
+			"name": "Logic App: UpsertProduct",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"object_name\": \"product\",\n\t\"fields\": {\n\t\t\"product_name\": \"ExampleProduct\",\n\t\t\"product_label\": \"Example Product\",\n\t\t\"product_number\": \"1\",\n\t\t\"product_short_description\": \"This is a Short Description of Example Product\",\n\t\t\"product_long_description\": \"This is a Long Description of Example Product\",\n\t\t\"product_id\": \"product_1\",\n\t\t\"catalog_id\": \"catalog_1\",\n\t\t\"product_family_id\": \"product_1\"\n\t}\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://prod-18.centralus.logic.azure.com:443/workflows/712442db45e14b28a84c1ad2186ef64a/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=skTnsPapDmgwDpEtGKR9E_5KUQyiBVY9RJH2OkcS1qU",
+					"protocol": "https",
+					"host": [
+						"prod-18",
+						"centralus",
+						"logic",
+						"azure",
+						"com"
+					],
+					"port": "443",
+					"path": [
+						"workflows",
+						"712442db45e14b28a84c1ad2186ef64a",
+						"triggers",
+						"manual",
+						"paths",
+						"invoke"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-10-01"
+						},
+						{
+							"key": "sp",
+							"value": "%2Ftriggers%2Fmanual%2Frun"
+						},
+						{
+							"key": "sv",
+							"value": "1.0"
+						},
+						{
+							"key": "sig",
+							"value": "skTnsPapDmgwDpEtGKR9E_5KUQyiBVY9RJH2OkcS1qU"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Logic App: Upsert Product Family",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"object_name\": \"product_family\",\n\t\"fields\": {\n\t\t\"product_family_name\": \"ExampleProductFamily\",\n\t\t\"product_family_label\": \"Example Product Family\",\n\t\t\"product_family_short_description\": \"This is a Short Description for an Example Product Family\",\n\t\t\"product_family_long_description\": \"This is a Long Description for an Example Product Family\",\n\t\t\"product_family_id\": \"product_family_1\"\n\t}\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://prod-18.centralus.logic.azure.com:443/workflows/712442db45e14b28a84c1ad2186ef64a/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=skTnsPapDmgwDpEtGKR9E_5KUQyiBVY9RJH2OkcS1qU",
+					"protocol": "https",
+					"host": [
+						"prod-18",
+						"centralus",
+						"logic",
+						"azure",
+						"com"
+					],
+					"port": "443",
+					"path": [
+						"workflows",
+						"712442db45e14b28a84c1ad2186ef64a",
+						"triggers",
+						"manual",
+						"paths",
+						"invoke"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-10-01"
+						},
+						{
+							"key": "sp",
+							"value": "%2Ftriggers%2Fmanual%2Frun"
+						},
+						{
+							"key": "sv",
+							"value": "1.0"
+						},
+						{
+							"key": "sig",
+							"value": "skTnsPapDmgwDpEtGKR9E_5KUQyiBVY9RJH2OkcS1qU"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Logic App: Upsert Product Catalog",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"object_name\": \"product_catalog\",\n\t\"fields\": {\n\t\t\"CatalogName\": \"ExampleCatalog\",\n\t\t\"CatalogLabel\": \"Example Catalog\",\n\t\t\"CatalogDescription\": \"This is an example Catalog\",\n\t\t\"catalog_id\": \"catalog_1\"\n\t}\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://prod-18.centralus.logic.azure.com:443/workflows/712442db45e14b28a84c1ad2186ef64a/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=skTnsPapDmgwDpEtGKR9E_5KUQyiBVY9RJH2OkcS1qU",
+					"protocol": "https",
+					"host": [
+						"prod-18",
+						"centralus",
+						"logic",
+						"azure",
+						"com"
+					],
+					"port": "443",
+					"path": [
+						"workflows",
+						"712442db45e14b28a84c1ad2186ef64a",
+						"triggers",
+						"manual",
+						"paths",
+						"invoke"
+					],
+					"query": [
+						{
+							"key": "api-version",
+							"value": "2016-10-01"
+						},
+						{
+							"key": "sp",
+							"value": "%2Ftriggers%2Fmanual%2Frun"
+						},
+						{
+							"key": "sv",
+							"value": "1.0"
+						},
+						{
+							"key": "sig",
+							"value": "skTnsPapDmgwDpEtGKR9E_5KUQyiBVY9RJH2OkcS1qU"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
