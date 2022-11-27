@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace SY.ContentHub.AzureFunctions.Models
 {
-	public class GetEntityByIdRequest
+	public class GetEntityByIdRequest : GetEntityRequest
 	{
 		public long entityId;
 		public bool? includePublicLinks;

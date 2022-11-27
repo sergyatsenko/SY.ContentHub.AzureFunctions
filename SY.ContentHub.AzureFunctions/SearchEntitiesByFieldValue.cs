@@ -8,7 +8,6 @@ using Stylelabs.M.Base.Querying.Linq;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
 using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.WebClient;
-using Stylelabs.M.Sdk.WebClient.Authentication;
 using SY.ContentHub.AzureFunctions.Models;
 using System;
 using System.Collections.Generic;
@@ -22,7 +21,7 @@ using System.Threading.Tasks;
 namespace SY.ContentHub.AzureFunctions
 {
 	/// <summary>
-	/// Find Entities by single field value.
+	/// Find Entities by field value and definition name
 	/// Optionally include related Entities using specified relations.
 	/// </summary>
 	public static partial class SearchEntitiesByFieldValue
@@ -40,17 +39,7 @@ namespace SY.ContentHub.AzureFunctions
 			try
 			{
 				//Initialize CH Web SDK client
-				var clientInfo = Utils.ExtractClientInfo(req.Headers);
-				Uri endpoint = new Uri(clientInfo.baseUrl);
-				OAuthPasswordGrant oauth = new OAuthPasswordGrant
-				{
-					ClientId = clientInfo.clientId,
-					ClientSecret = clientInfo.clientSecret,
-					UserName = clientInfo.userName,
-					Password = clientInfo.password
-				};
-
-				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
+				IWebMClient client = Utils.InitClient(req);
 
 				//Search for Entities matching the requested field value
 				IList<IEntity> entities;
@@ -85,14 +74,13 @@ namespace SY.ContentHub.AzureFunctions
 				var response = new List<EntityInfo>(); 
 				foreach (var entityObject in entities)
 				{
-					var relations = await Utils.GetRelatedEntities(client, entityObject, requestObject.relations, log);
+					var relations = await Utils.GetRelatedEntities(client, entityObject, requestObject.relations, requestObject.resolveToSolrFieldNames, log);
 
 					var entity = new EntityInfo
 					{
 						Entity = Utils.ExtractEntityData(entityObject),
 						Relations = relations
 					};
-
 
 					response.Add(entity);
 				}

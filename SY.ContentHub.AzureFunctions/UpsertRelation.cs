@@ -54,18 +54,7 @@ namespace SY.ContentHub.AzureFunctions
 				}
 
 				//Initialize CH Web SDK client
-				var clientInfo = Utils.ExtractClientInfo(req.Headers);
-				Uri endpoint = new Uri(clientInfo.baseUrl);
-				OAuthPasswordGrant oauth = new OAuthPasswordGrant
-				{
-					ClientId = clientInfo.clientId,
-					ClientSecret = clientInfo.clientSecret,
-					UserName = clientInfo.userName,
-					Password = clientInfo.password
-				};
-
-				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
-
+				IWebMClient client = Utils.InitClient(req);
 
 				IEntity parentEntity = await Utils.SearchSingleEntity(client,
 											(entities =>

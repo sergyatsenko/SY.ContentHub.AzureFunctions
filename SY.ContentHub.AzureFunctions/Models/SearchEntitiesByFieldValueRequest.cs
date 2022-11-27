@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace SY.ContentHub.AzureFunctions.Models
 {
-	public class SearchEntitiesByFieldValueRequest
+	public class SearchEntitiesByFieldValueRequest : GetEntityRequest
 	{
 		public EntitySearch entitySearch { get; set; }
 		public List<string> relations { get; set; }

@@ -4,6 +4,7 @@ using Stylelabs.M.Framework.Essentials.LoadConfigurations;
 using Stylelabs.M.Sdk.Contracts.Base;
 using Stylelabs.M.Sdk.Contracts.Querying;
 using Stylelabs.M.Sdk.WebClient;
+using Stylelabs.M.Sdk.WebClient.Authentication;
 using SY.ContentHub.AzureFunctions.Models;
 using System;
 using System.Collections.Generic;
@@ -75,7 +76,7 @@ namespace SY.ContentHub.AzureFunctions
 		/// <param name="queryFunction"></param>
 		/// <param name="log">optional logger - ignore if no logging is needed</param>
 		/// <returns>List of IDs of entities matching the search criteria</returns>
-		public static async Task<IList<long>> SearcEntityIDs(IWebMClient client, Func<QueryableEntities<IQueryableEntity>, IQueryable<IQueryableEntity>> queryFunction, TraceWriter log = null)
+		public static async Task<IList<long>> SearchEntityIDs(IWebMClient client, Func<QueryableEntities<IQueryableEntity>, IQueryable<IQueryableEntity>> queryFunction, TraceWriter log = null)
 		{
 			log?.Info($"Search query function: {queryFunction}");
 			//Initialize the query with given search criteria (function)
@@ -189,6 +190,38 @@ namespace SY.ContentHub.AzureFunctions
 			}
 		}
 
+		/// <summary>
+		/// Get Content Hub Entity by ID
+		/// </summary>
+		/// <param name="client"></param>
+		/// <param name="entityId">ID of the Entity</param>
+		/// <param name="loadConfiguration">Entity load configuration, contolling how much data to load from CH.</param>
+		/// <param name="log">optional logger</param>
+		/// <returns>Entity or null if not found.</returns>
+		public static async Task<IEntity> GetEntity(IWebMClient client, long entityId, IEntityLoadConfiguration loadConfiguration, TraceWriter log = null)
+		{
+			try
+			{
+				//Read Entitty and load its fields and relations as per specified LoadConfiguration
+				var entity = await client.Entities.GetAsync(entityId, EntityLoadConfiguration.Full);
+
+				if (entity != null)
+				{
+					//Log and return the results
+					log?.Info($"Found entitity. ID: {entity.Id}", "GetEntity");
+					return entity;
+				}
+
+				return null;
+			}
+			catch (Exception ex)
+			{
+				//Log and re-throw the exception
+				log?.Error($"error message: {ex.Message}", ex, "GetEntity");
+				throw ex;
+			}
+		}
+
 
 		public static async Task<ResponseData> PostContentAsync(HttpClient httpClient, Uri requestUri, string content, TraceWriter log = null)
 		{
@@ -231,7 +264,7 @@ namespace SY.ContentHub.AzureFunctions
 			}
 		}
 
-		public static async Task<Dictionary<string, List<dynamic>>> GetRelatedEntities(IWebMClient client, IEntity entity, List<string> relationFields, TraceWriter log = null)
+		public static async Task<Dictionary<string, List<dynamic>>> GetRelatedEntities(IWebMClient client, IEntity entity, List<string> relationFields, bool resolveSolrNames, TraceWriter log = null)
 		{
 			var relations = new Dictionary<string, List<dynamic>>();
 			if (relationFields != null && relationFields.Any())
@@ -252,7 +285,7 @@ namespace SY.ContentHub.AzureFunctions
 							{
 								var entityData = new
 								{
-									Properties = Utils.ExtractEntityData(relatedEntity),
+									Properties = resolveSolrNames ? ExtractEntityData(relatedEntity, solrFieldNameResolver) : ExtractEntityData(relatedEntity, defaultFieldNameResolver),
 									Renditions = entity.Renditions
 								};
 								relationData.Add(entityData);
@@ -270,51 +303,7 @@ namespace SY.ContentHub.AzureFunctions
 			return relations;
 		}
 
-		public static Dictionary<string, object> ExtractEntityData(IEntity entity)
-		{
-			var e = new Dictionary<string, object>
-			{
-				{ "Id", entity.Id },
-				{ "Identifier", entity.Identifier },
-				{ "DefinitionName", entity.DefinitionName },
-				{ "CreatedBy", entity.CreatedBy },
-				{ "CreatedOn", entity.CreatedOn },
-				{ "IsDirty", entity.IsDirty },
-				{ "IsNew", entity.IsNew },
-				{ "IsRootTaxonomyItem", entity.IsRootTaxonomyItem },
-				{ "IsPathRoot", entity.IsPathRoot },
-				{ "IsSystemOwned", entity.IsSystemOwned },
-				{ "Version", entity.Version },
-				{ "Cultures", entity.Cultures }
-			};
-
-			var relativeUrl = entity.GetPropertyValue<string>("RelativeUrl");
-			var versionHash = entity.GetPropertyValue<string>("VersionHash");
-
-			if (!string.IsNullOrEmpty(relativeUrl) && !string.IsNullOrEmpty(versionHash))
-			{
-				var publicLink = $"api/public/content/{relativeUrl}?v={versionHash}";
-				e.Add("PublicLink", publicLink);
-			}
-
-			foreach (var property in entity.Properties)
-			{
-				try
-				{
-					var propertyValue = entity.GetPropertyValue(property.Name);
-					e.Add(property.Name, propertyValue);
-				}
-				catch (Exception ex) when (ex.Message == "Culture is required for culture sensitive properties.")
-				{
-					var propertyValue = entity.GetPropertyValue(property.Name, CultureInfo.GetCultureInfo("en-US"));
-					e.Add(property.Name, propertyValue);
-				}
-			}
-
-			return e;
-		}
-
-		public static async Task<List<IEntity>> GetRelatedEntities(IWebMClient client, IEntity entity, string entityRelation, IEntityLoadConfiguration full, TraceWriter log)
+		public static async Task<List<IEntity>> GetRelatedEntities(IWebMClient client, IEntity entity, string entityRelation, IEntityLoadConfiguration loadConfiguration, TraceWriter log)
 		{
 			if (!string.IsNullOrEmpty(entityRelation))
 			{
@@ -358,7 +347,7 @@ namespace SY.ContentHub.AzureFunctions
 			return null;
 		}
 
-		public static async Task<IList<long>> GetRelationIDs(IWebMClient client, IEntity entity, string entityRelation, IEntityLoadConfiguration full, TraceWriter log)
+		public static IList<long> GetRelationIDs(IWebMClient client, IEntity entity, string entityRelation, IEntityLoadConfiguration loadConfiguration, TraceWriter log)
 		{
 			if (!string.IsNullOrEmpty(entityRelation))
 			{
@@ -392,5 +381,107 @@ namespace SY.ContentHub.AzureFunctions
 			return null;
 		}
 
+		public static string defaultFieldNameResolver(string fieldName, Type type)
+		{
+			return fieldName;
+		}
+
+		public static string solrFieldNameResolver(string fieldName, Type type)
+		{
+			switch (type)
+			{
+				case Type t when t == typeof(string) 
+							|| t == typeof(Guid)
+							|| t == typeof(short)
+							|| t == typeof(char):
+					return $"{fieldName}_s";
+				case Type t when t == typeof(int) || t == typeof(long):
+					return $"{fieldName}_tl";
+				case Type t when t == typeof(float) || t == typeof(decimal):
+					return $"{fieldName}_tf";
+				case Type t when t == typeof(double):
+					return $"{fieldName}_td";
+				case Type t when t == typeof(bool):
+					return $"{fieldName}_b";
+				case Type t when t == typeof(DateTime):
+					return $"{fieldName}_dtm";
+				default:
+					return $"{fieldName}_s";
+			}
+		}
+
+		/// <summary>
+		/// Read entity properties into name-value pairs
+		/// </summary>
+		/// <param name="entity">Source Entity</param>
+		/// <returns>name-value pairs representing all entity properties</returns>
+		public static Dictionary<string, object> ExtractEntityData(IEntity entity, Func<string, Type, string> nameResolver = null)
+		{
+			if (nameResolver == null) nameResolver = defaultFieldNameResolver;
+			
+			var e = new Dictionary<string, object>
+			{
+				{ nameResolver("Id", typeof(long)), entity.Id },
+				{ nameResolver("Identifier", typeof(string)), entity.Identifier },
+				{ nameResolver("DefinitionName", typeof(string)), entity.DefinitionName },
+				{ nameResolver("CreatedBy", typeof(long)), entity.CreatedBy },
+				{ nameResolver("CreatedOn", typeof(DateTime)), entity.CreatedOn },
+				{ nameResolver("IsDirty", typeof(bool)), entity.IsDirty },
+				{ nameResolver("IsNew", typeof(bool)), entity.IsNew },
+				{ nameResolver("IsRootTaxonomyItem", typeof(bool)), entity.IsRootTaxonomyItem },
+				{ nameResolver("IsPathRoot", typeof(bool)), entity.IsPathRoot },
+				{ nameResolver("IsSystemOwned", typeof(bool)), entity.IsSystemOwned },
+				{ nameResolver("Version", typeof(string)), entity.Version }
+				//{ nameResolver("Cultures", typeof(long)), entity.Cultures }
+			};
+
+			var relativeUrl = entity.GetPropertyValue<string>("RelativeUrl");
+			var versionHash = entity.GetPropertyValue<string>("VersionHash");
+
+			// Construct public link Urls if Entity happends to be an Asset and have public links set on it
+			if (!string.IsNullOrEmpty(relativeUrl) && !string.IsNullOrEmpty(versionHash))
+			{
+				var publicLink = $"api/public/content/{relativeUrl}?v={versionHash}";
+				e.Add(nameResolver("PublicLink", typeof(string)), publicLink);
+			}
+
+			foreach (var property in entity.Properties)
+			{
+				try
+				{
+					var propertyValue = entity.GetPropertyValue(property.Name);
+					e.Add(nameResolver(property.Name, property.DataType), propertyValue);
+				}
+				catch (Exception ex) when (ex.Message == "Culture is required for culture sensitive properties.")
+				{
+					var propertyValue = entity.GetPropertyValue(property.Name, CultureInfo.GetCultureInfo("en-US"));
+					e.Add(nameResolver(property.Name, property.DataType), propertyValue);
+				}
+			}
+
+			return e;
+		}
+
+		/// <summary>
+		/// Initialize WebClient with credentials provided in a given request headers.
+		/// </summary>
+		/// <param name="request"></param>
+		/// <returns>WebClient</returns>
+		public static IWebMClient InitClient(HttpRequestMessage request)
+		{
+			var clientInfo = Utils.ExtractClientInfo(request.Headers);
+			Uri endpoint = new Uri(clientInfo.baseUrl);
+			OAuthPasswordGrant oauth = new OAuthPasswordGrant
+			{
+				ClientId = clientInfo.clientId,
+				ClientSecret = clientInfo.clientSecret,
+				UserName = clientInfo.userName,
+				Password = clientInfo.password
+			};
+
+			IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
+			return client;
+		}
+		
 	}
 }

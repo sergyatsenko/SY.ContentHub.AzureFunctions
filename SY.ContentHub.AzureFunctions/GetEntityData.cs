@@ -36,21 +36,10 @@ namespace SY.ContentHub.AzureFunctions
             long targetIdValue = (long)data.SelectToken(targetEntityIdJsonPath);
             log.Info($"targetIdValue: {targetIdValue}");
 
-            string baseUrl = Utils.GetHeaderValue(req.Headers, "ContentHubUrl");
-
-			Uri endpoint = new Uri(baseUrl);
-
-            OAuthPasswordGrant oauth = new OAuthPasswordGrant
-            {
-                ClientId = Utils.GetHeaderValue(req.Headers, "ClientId"), //"DevIntegration"
-                ClientSecret = Utils.GetHeaderValue(req.Headers, "ClientSecret"), //"DevIntegration",
-                UserName = Utils.GetHeaderValue(req.Headers, "UserName"), //"Integration",
-                Password = Utils.GetHeaderValue(req.Headers, "Password") //"Integration1"
-            };
-
-            // Create the Web SDK client
-            IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
-            IEntity entity = await client.Entities.GetAsync(targetIdValue, EntityLoadConfiguration.Full);
+			// Create the Web SDK client
+			IWebMClient client = Utils.InitClient(req);
+			
+			IEntity entity = await client.Entities.GetAsync(targetIdValue, EntityLoadConfiguration.Full);
             log.Info("Made request to CH...");
             if (entity == null)
             {
@@ -64,7 +53,7 @@ namespace SY.ContentHub.AzureFunctions
             {
                 Properties = Utils.ExtractEntityData(entity),
                 Renditions = entity.Renditions,
-                Relations = await Utils.GetRelatedEntities(client, entity, null, log)
+                Relations = await Utils.GetRelatedEntities(client, entity, null, false, log)
 			};
             var resultJson = JsonConvert.SerializeObject(result);
             return new HttpResponseMessage(HttpStatusCode.OK)

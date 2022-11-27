@@ -31,19 +31,9 @@ namespace SY.ContentHub.AzureFunctions
             var searchFieldName = Utils.GetHeaderValue(req.Headers, "searchFieldName");
             var searchFieldValue = Utils.GetHeaderValue(req.Headers, "searchFieldValue");
 
-            Uri endpoint = new Uri(Utils.GetHeaderValue(req.Headers, "ContentHubUrl"));
+			IWebMClient client = Utils.InitClient(req);
 
-            OAuthPasswordGrant oauth = new OAuthPasswordGrant
-            {
-                ClientId = Utils.GetHeaderValue(req.Headers, "ClientId"), 
-                ClientSecret = Utils.GetHeaderValue(req.Headers, "ClientSecret"),
-                UserName = Utils.GetHeaderValue(req.Headers, "UserName"), 
-                Password = Utils.GetHeaderValue(req.Headers, "Password") 
-            };
-
-            IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
-
-            var entityQuery = Query.CreateQuery(entities =>
+			var entityQuery = Query.CreateQuery(entities =>
                          from e in entities
                          where e.Property(searchFieldName) == searchFieldValue
                          where e.DefinitionName == entityDefinitionName

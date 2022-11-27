@@ -6,7 +6,6 @@ using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
 using Stylelabs.M.Base.Querying.Linq;
 using Stylelabs.M.Sdk.WebClient;
-using Stylelabs.M.Sdk.WebClient.Authentication;
 using SY.ContentHub.AzureFunctions.Models;
 using System;
 using System.Collections.Generic;
@@ -37,24 +36,14 @@ namespace SY.ContentHub.AzureFunctions
 			try
 			{
 				//Initialize CH Web SDK client
-				var clientInfo = Utils.ExtractClientInfo(req.Headers);
-				Uri endpoint = new Uri(clientInfo.baseUrl);
-				OAuthPasswordGrant oauth = new OAuthPasswordGrant
-				{
-					ClientId = clientInfo.clientId,
-					ClientSecret = clientInfo.clientSecret,
-					UserName = clientInfo.userName,
-					Password = clientInfo.password
-				};
+				IWebMClient client = Utils.InitClient(req);
 
-				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
-				
 				//Search for Entities matching the requested field value
 				IList<long> entityIDs;
 				if (string.IsNullOrEmpty(requestObject.entitySearch.entitySearchField.fieldValue) || string.IsNullOrEmpty(requestObject.entitySearch.entitySearchField.fieldName))
 				{
 					//Search for IDs of all entities matching given definition
-					entityIDs = await Utils.SearcEntityIDs(client,
+					entityIDs = await Utils.SearchEntityIDs(client,
 											(entities =>
 											from e in entities
 											where e.DefinitionName == requestObject.entitySearch.entitySearchField.definitionName
@@ -64,7 +53,7 @@ namespace SY.ContentHub.AzureFunctions
 				else
 				{
 					//Search for IDs of all entities matching given definition AND field value
-					entityIDs = await Utils.SearcEntityIDs(client,
+					entityIDs = await Utils.SearchEntityIDs(client,
 											(entities =>
 											from e in entities
 											where e.Property(requestObject.entitySearch.entitySearchField.fieldName) == requestObject.entitySearch.entitySearchField.fieldValue
@@ -72,7 +61,7 @@ namespace SY.ContentHub.AzureFunctions
 											select e),
 											log);
 				}
-				
+
 				if (entityIDs == null || entityIDs.Count == 0)
 				{
 					return req.CreateResponse(HttpStatusCode.NotFound, $"No entities found for field {requestObject.entitySearch.entitySearchField.fieldName} with value {requestObject.entitySearch.entitySearchField.fieldValue}");

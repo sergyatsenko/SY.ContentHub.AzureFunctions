@@ -5,27 +5,19 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Newtonsoft.Json;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
-using Stylelabs.M.Sdk.Contracts.Base;
-using Stylelabs.M.Sdk.Models.Base;
 using Stylelabs.M.Sdk.WebClient;
-using Stylelabs.M.Sdk.WebClient.Authentication;
 using SY.ContentHub.AzureFunctions.Models;
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace SY.ContentHub.AzureFunctions
 {
 	/// <summary>
-	/// Find Entities by single field value.
-	/// Optionally include related Entities using specified relations.
+	/// Get Entity by ID and then if found, load entities from specified relations 
 	/// </summary>
 	public static partial class GetEntityById
 	{
@@ -41,33 +33,28 @@ namespace SY.ContentHub.AzureFunctions
 
 			try
 			{
-				//Initialize CH Web SDK client
-				var clientInfo = Utils.ExtractClientInfo(req.Headers);
-				Uri endpoint = new Uri(clientInfo.baseUrl);
-				OAuthPasswordGrant oauth = new OAuthPasswordGrant
-				{
-					ClientId = clientInfo.clientId,
-					ClientSecret = clientInfo.clientSecret,
-					UserName = clientInfo.userName,
-					Password = clientInfo.password
-				};
+				//Initialize WebClient 
+				IWebMClient client = Utils.InitClient(req);
+				//Get Entity by ID and load all its properties and relations
+				var entity = await Utils.GetEntity(client, requestObject.entityId, EntityLoadConfiguration.Full, log);
 
-				IWebMClient client = MClientFactory.CreateMClient(endpoint, oauth);
-
-				var entity = await client.Entities.GetAsync(requestObject.entityId, EntityLoadConfiguration.Full);
 				if (entity == null)
 				{
 					return req.CreateResponse(HttpStatusCode.NotFound, $"Entity with Id {requestObject.entityId} not found.");
 				}
 
-				var relations = await Utils.GetRelatedEntities(client, entity, requestObject.relations, log);
+				//Load all related entities, linked to specified relation fields
+				var relations = await Utils.GetRelatedEntities(client, entity, requestObject.relations, requestObject.resolveToSolrFieldNames, log);
 
+				//Create response object
 				var result = new EntityInfo
 				{
-					Entity = Utils.ExtractEntityData(entity),
+					//Read entity properties into name-value pairs
+					Entity = requestObject.resolveToSolrFieldNames ? Utils.ExtractEntityData(entity, Utils.solrFieldNameResolver) : Utils.ExtractEntityData(entity, Utils.defaultFieldNameResolver),
 					Relations = relations
 				};
 
+				//Serialize response object into JSON and return that as HTTP response
 				var resultJson = JsonConvert.SerializeObject(result);
 				return new HttpResponseMessage(HttpStatusCode.OK)
 				{
@@ -94,8 +81,6 @@ namespace SY.ContentHub.AzureFunctions
 				};
 			}
 		}
-
-		
 	}
 }
 
