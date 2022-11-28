@@ -6,7 +6,7 @@ namespace SY.ContentHub.AzureFunctions.Models
 {
 	public class EntityInfo
 	{
-		public Dictionary<string, object>  Entity {get; set;}
+		public EntityDataResponse Entity {get; set;}
 		public Dictionary<string, List<dynamic>> Relations { get; set; }
 	}
 }

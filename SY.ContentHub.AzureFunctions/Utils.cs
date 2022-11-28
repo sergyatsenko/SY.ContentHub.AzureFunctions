@@ -1,4 +1,5 @@
 ﻿using Microsoft.Azure.WebJobs.Host;
+using Newtonsoft.Json.Linq;
 using Stylelabs.M.Base.Querying.Linq;
 using Stylelabs.M.Framework.Essentials.LoadConfigurations;
 using Stylelabs.M.Sdk.Contracts.Base;
@@ -20,14 +21,14 @@ using Query = Stylelabs.M.Base.Querying.Query;
 
 namespace SY.ContentHub.AzureFunctions
 {
-	public class ResponseData
+    public class ResponseData
 	{
 		public HttpStatusCode StatusCode { get; set; }
 		public string ResponseBody { get; set; }
 		public bool IsSuccessStatusCode { get; set; }
 
 	}
-	public static class Utils
+	public static partial class Utils
 	{
 		public static Client ExtractClientInfo(HttpRequestHeaders headers)
 		{
@@ -388,16 +389,24 @@ namespace SY.ContentHub.AzureFunctions
 
 		public static string solrFieldNameResolver(string fieldName, Type type)
 		{
+			if (type.IsGenericType &&
+					type.GetGenericTypeDefinition() == typeof(Nullable<>))
+			{
+				type = type.GetGenericArguments()[0];
+			}
+			//fieldName = $"{fieldName}_{type.Name}_{type.HasElementType}";
 			switch (type)
 			{
 				case Type t when t == typeof(string) 
-							|| t == typeof(Guid)
+							|| t == typeof(Guid) 
 							|| t == typeof(short)
 							|| t == typeof(char):
 					return $"{fieldName}_s";
-				case Type t when t == typeof(int) || t == typeof(long):
+				case Type t when t == typeof(int) 
+							|| t == typeof(long):
 					return $"{fieldName}_tl";
-				case Type t when t == typeof(float) || t == typeof(decimal):
+				case Type t when t == typeof(float)
+							|| t == typeof(decimal):
 					return $"{fieldName}_tf";
 				case Type t when t == typeof(double):
 					return $"{fieldName}_td";
@@ -415,17 +424,18 @@ namespace SY.ContentHub.AzureFunctions
 		/// </summary>
 		/// <param name="entity">Source Entity</param>
 		/// <returns>name-value pairs representing all entity properties</returns>
-		public static Dictionary<string, object> ExtractEntityData(IEntity entity, Func<string, Type, string> nameResolver = null)
+		public static EntityDataResponse ExtractEntityData(IEntity entity, Func<string, Type, string> nameResolver = null, string baseUrl = null)
 		{
 			if (nameResolver == null) nameResolver = defaultFieldNameResolver;
-			
-			var e = new Dictionary<string, object>
+			//var convertDatesToSolrFormat = nameResolver == solrFieldNameResolver && propertyValue != null && (property.DataType == typeof(DateTime) || property.DataType == typeof(DateTime?))
+			var objects = new Dictionary<string, object>();
+			var properties = new Dictionary<string, object>
 			{
 				{ nameResolver("Id", typeof(long)), entity.Id },
 				{ nameResolver("Identifier", typeof(string)), entity.Identifier },
 				{ nameResolver("DefinitionName", typeof(string)), entity.DefinitionName },
 				{ nameResolver("CreatedBy", typeof(long)), entity.CreatedBy },
-				{ nameResolver("CreatedOn", typeof(DateTime)), entity.CreatedOn },
+				{ nameResolver("CreatedOn", typeof(DateTime)), nameResolver == solrFieldNameResolver ? string.Format("{0:yyyy-MM-dd HH:mm:ss.ff}", entity.CreatedOn): entity.CreatedOn.ToString() },
 				{ nameResolver("IsDirty", typeof(bool)), entity.IsDirty },
 				{ nameResolver("IsNew", typeof(bool)), entity.IsNew },
 				{ nameResolver("IsRootTaxonomyItem", typeof(bool)), entity.IsRootTaxonomyItem },
@@ -441,8 +451,8 @@ namespace SY.ContentHub.AzureFunctions
 			// Construct public link Urls if Entity happends to be an Asset and have public links set on it
 			if (!string.IsNullOrEmpty(relativeUrl) && !string.IsNullOrEmpty(versionHash))
 			{
-				var publicLink = $"api/public/content/{relativeUrl}?v={versionHash}";
-				e.Add(nameResolver("PublicLink", typeof(string)), publicLink);
+				var publicLink = $"{baseUrl}/api/public/content/{relativeUrl}?v={versionHash}";
+				properties.Add(nameResolver("PublicLink", typeof(string)), publicLink);
 			}
 
 			foreach (var property in entity.Properties)
@@ -450,16 +460,37 @@ namespace SY.ContentHub.AzureFunctions
 				try
 				{
 					var propertyValue = entity.GetPropertyValue(property.Name);
-					e.Add(nameResolver(property.Name, property.DataType), propertyValue);
+					if (property.DataType == typeof(JToken))
+					{
+						objects.Add(property.Name, propertyValue);
+					}
+					else
+					{
+						//I know, I know, this is an ugly temporary fix.
+						//TODO: refactor this temp code into proper type conversion
+						object value = propertyValue;
+						if (nameResolver == solrFieldNameResolver && (property.DataType == typeof(DateTime) || property.DataType == typeof(DateTime?)))
+						{
+							value = string.Format("{0:yyyy-MM-dd HH:mm:ss.ff}", entity.CreatedOn);
+						}
+						//var value = nameResolver == solrFieldNameResolver nameResolver == solrFieldNameResolver ? string.Format("0:yyyy-MM-dd HH:mm:ss.ff", entity.CreatedOn) : entity.CreatedOn.ToString()
+						//	? ((DateTime)propertyValue).ToString("yyyy-MM-dd HH:mm:ss.ff") : propertyValue;
+						
+						properties.Add(nameResolver(property.Name, property.DataType), value);
+					}
 				}
 				catch (Exception ex) when (ex.Message == "Culture is required for culture sensitive properties.")
 				{
 					var propertyValue = entity.GetPropertyValue(property.Name, CultureInfo.GetCultureInfo("en-US"));
-					e.Add(nameResolver(property.Name, property.DataType), propertyValue);
+					properties.Add(nameResolver(property.Name, property.DataType), propertyValue);
 				}
 			}
 
-			return e;
+			return new EntityDataResponse 
+			{ 
+				Objects = objects,
+				Properties = properties
+			};
 		}
 
 		/// <summary>
